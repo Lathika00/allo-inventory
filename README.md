@@ -1,57 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Allo Inventory
 
-## Getting Started
+Inventory reservation demo built with Next.js, Prisma, and Upstash Redis.
 
-First, run the development server:
+## Run Locally
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment variables
+
+Create a `.env` file in the project root and set:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+UPSTASH_REDIS_REST_URL="<your-upstash-rest-url>"
+UPSTASH_REDIS_REST_TOKEN="<your-upstash-rest-token>"
+```
+
+If you are using SQLite a local database URL can also work, but this project is configured for a standard Prisma datasource.
+
+### 3. Run Prisma migrations
+
+```bash
+npx prisma migrate dev --name init
+```
+
+This will create the database schema from `prisma/schema.prisma` and populate the `prisma/migrations` folder.
+
+### 4. Seed the database
+
+```bash
+npx prisma db seed
+```
+
+The seed script at `prisma/seed.ts` creates example warehouses, products, and inventory records.
+
+### 5. Start the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Required variables:
 
-## Learn More
+- `DATABASE_URL` — Prisma datasource connection string
+- `UPSTASH_REDIS_REST_URL` — Upstash Redis REST URL
+- `UPSTASH_REDIS_REST_TOKEN` — Upstash Redis REST token
 
-To learn more about Next.js, take a look at the following resources:
+## How Expiry Works in Production
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Reservations are created with a 10-minute expiry window in `src/app/api/reservations/route.ts`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- When a reservation is created, `expiresAt` is set to `Date.now() + 10 * 60 * 1000`.
+- Pending reservations are considered expired once `expiresAt` is in the past.
+- The cleanup endpoint at `src/app/api/cron/route.ts` finds expired pending reservations, releases reserved inventory, and marks them as `released`.
+
+### Current production behavior
+
+This repo currently relies on an explicit `GET /api/cron` cleanup path.
+
+- The client triggers this cleanup before loading reservations in the dashboard.
+- In a production-ready deployment, this should be backed by a scheduled job or cron trigger.
+
+### Recommended production setup
+
+For reliable expiry handling, use a scheduler instead of depending on client activity:
+
+- Vercel Cron Jobs / scheduled functions
+- GitHub Actions or an external cron service
+- A lightweight serverless job that calls `/api/cron` every few minutes
+
+That ensures stale pending reservations are cleaned even when nobody is actively browsing the app.
+
+## Trade-offs and Future Improvements
+
+### Trade-offs made
+
+- Simple validation is implemented with shared Zod schemas, but the client still uses a minimal homegrown form flow rather than a formal form library.
+- Expiry cleanup is accessible through an API route instead of a guaranteed server-side scheduler.
+- Caching is focused on the reservation list only, using Upstash Redis with a 10-minute TTL.
+- No authentication or authorization is implemented, which keeps the app simple but not production-secure.
+
+### What I'd do differently with more time
+
+- Add a proper scheduled cron job for `api/cron` cleanup in production.
+- Use a dedicated form validation library like React Hook Form or Formik with Zod integration.
+- Add typed API response models and stronger error handling across client/server boundaries.
+- Introduce authentication so reservation actions are owner-aware and protected.
+- Expand caching and data invalidation to reduce load on the database for more endpoints.
+- Add end-to-end tests for reservation creation, expiry, and release flows.
+
+## Upstash Redis (Caching)
+
+The project already includes `src/lib/upstash.ts` and uses Redis caching for the reservations list at `src/app/api/reservations/all/route.ts`.
+
+- The reservations cache is retained for 10 minutes.
+- Cache invalidation occurs when reservations are created, confirmed, released, or cleared.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The easiest way to deploy is with [Vercel](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
----
-
-Upstash Redis (caching)
-
-1. Add the following environment variables (Vercel or local):
-
-```
-UPSTASH_REDIS_REST_URL=<your-upstash-rest-url>
-UPSTASH_REDIS_REST_TOKEN=<your-upstash-rest-token>
-```
-
-2. Install the dependency:
-
-```bash
-npm install @upstash/redis
-```
-
-3. The project includes `src/lib/upstash.ts` and the `reservations/all` endpoint now caches the reservations list for 10 minutes.
-
-If you want caching applied elsewhere (rate-limits, sessions, pub/sub), tell me where and I'll add examples.
+For production, also configure the environment variables listed above and add a scheduled job to call `/api/cron` regularly.
