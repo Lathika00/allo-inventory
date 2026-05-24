@@ -64,9 +64,26 @@ export async function POST(req: NextRequest) {
         const name = product.trim();
 
         const inventory = await prisma.$transaction(async (tx) => {
-            let existingProduct = await tx.product.findFirst({
+            const productsWithName = await tx.product.findMany({
                 where: { name },
             });
+
+            let existingProduct =
+                (
+                    await Promise.all(
+                        productsWithName.map(async (p) => {
+                            const inv = await tx.inventory.findUnique({
+                                where: {
+                                    productId_warehouseId: {
+                                        productId: p.id,
+                                        warehouseId,
+                                    },
+                                },
+                            });
+                            return inv ? p : null;
+                        })
+                    )
+                ).find((p) => p !== null) ?? productsWithName[0] ?? null;
 
             if (!existingProduct) {
                 existingProduct = await tx.product.create({
@@ -74,10 +91,12 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            const existingInventory = await tx.inventory.findFirst({
+            const existingInventory = await tx.inventory.findUnique({
                 where: {
-                    productId: existingProduct.id,
-                    warehouseId,
+                    productId_warehouseId: {
+                        productId: existingProduct.id,
+                        warehouseId,
+                    },
                 },
             });
 
@@ -112,6 +131,68 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(mapInventory(inventory), { status: 201 });
     } catch {
+        return NextResponse.json(
+            { error: "Something went wrong" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const inventoryId = req.nextUrl.searchParams.get("inventoryId");
+
+    if (!inventoryId) {
+        return NextResponse.json(
+            { error: "inventoryId is required" },
+            { status: 400 }
+        );
+    }
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            const inventory = await tx.inventory.findUnique({
+                where: { id: inventoryId },
+            });
+
+            if (!inventory) {
+                throw new Error("NOT_FOUND");
+            }
+
+            await tx.reservation.deleteMany({
+                where: {
+                    productId: inventory.productId,
+                    warehouseId: inventory.warehouseId,
+                },
+            });
+
+            await tx.inventory.delete({
+                where: { id: inventoryId },
+            });
+
+            const remainingInventory = await tx.inventory.count({
+                where: { productId: inventory.productId },
+            });
+
+            if (remainingInventory === 0) {
+                await tx.reservation.deleteMany({
+                    where: { productId: inventory.productId },
+                });
+
+                await tx.product.delete({
+                    where: { id: inventory.productId },
+                });
+            }
+        });
+
+        return NextResponse.json({ ok: true });
+    } catch (error) {
+        if (error instanceof Error && error.message === "NOT_FOUND") {
+            return NextResponse.json(
+                { error: "Product not found" },
+                { status: 404 }
+            );
+        }
+
         return NextResponse.json(
             { error: "Something went wrong" },
             { status: 500 }

@@ -1,16 +1,13 @@
-import prisma from "../../../lib/prisma";
+import prisma from "../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function POST() {
     try {
-        const expiredReservations = await prisma.reservation.findMany({
-            where: {
-                status: "pending",
-                expiresAt: { lt: new Date() },
-            },
+        const pending = await prisma.reservation.findMany({
+            where: { status: "pending" },
         });
 
-        for (const reservation of expiredReservations) {
+        for (const reservation of pending) {
             await prisma.$transaction(async (tx) => {
                 const inventory = await tx.inventory.findUnique({
                     where: {
@@ -39,11 +36,8 @@ export async function GET() {
             });
         }
 
-        return NextResponse.json({
-            message: "Expired reservations cleaned",
-            count: expiredReservations.length,
-        });
+        return NextResponse.json({ released: pending.length });
     } catch {
-        return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
+        return NextResponse.json({ error: "Clear failed" }, { status: 500 });
     }
 }
