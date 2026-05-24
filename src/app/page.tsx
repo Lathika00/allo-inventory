@@ -220,28 +220,40 @@ export default function Home() {
                                                     "Content-Type": "application/json"
                                                 },
                                                 body: JSON.stringify({
-
                                                     productId: item.productId,
                                                     warehouseId: item.warehouseId,
                                                     quantity: 1
-
                                                 })
                                             }
-                                        )
+                                        );
 
                                         if (response.ok) {
 
                                             setMessage(
                                                 "Reservation created successfully ✅"
-                                            )
+                                            );
 
-                                            loadProducts()
+                                            loadProducts();
 
                                         }
 
                                     }}
+
+                                    style={{
+                                        width: "100%",
+                                        padding: "14px",
+                                        border: "none",
+                                        borderRadius: "14px",
+                                        background:
+                                            "linear-gradient(to right,#3b82f6,#8b5cf6)",
+                                        color: "white",
+                                        fontWeight: "bold",
+                                        cursor: "pointer"
+                                    }}
                                 >
+
                                     Reserve Product
+
                                 </button>
                             </div>
                         ))}
