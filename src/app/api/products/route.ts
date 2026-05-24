@@ -1,5 +1,6 @@
 import prisma from "../../../lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { addProductRequestSchema } from "../../../lib/schemas";
 
 function mapInventory(item: {
     id: string;
@@ -44,24 +45,18 @@ export async function GET() {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { product, warehouseId, availableStock } = body;
+        const parsed = addProductRequestSchema.safeParse(body);
 
-        if (!product?.trim()) {
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: "Product name is required" },
+                { error: parsed.error.issues.map((issue) => issue.message).join(", ") },
                 { status: 400 }
             );
         }
 
-        if (!warehouseId) {
-            return NextResponse.json(
-                { error: "Warehouse is required" },
-                { status: 400 }
-            );
-        }
-
-        const totalUnits = Number(availableStock) || 0;
-        const name = product.trim();
+        const { product, warehouseId, availableStock } = parsed.data;
+        const totalUnits = availableStock;
+        const name = product;
 
         const inventory = await prisma.$transaction(async (tx) => {
             const productsWithName = await tx.product.findMany({

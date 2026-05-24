@@ -1,18 +1,21 @@
 import prisma from "../../../lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { delCached } from "../../../lib/upstash";
+import { reservationRequestSchema } from "../../../lib/schemas";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { inventoryId, productId, warehouseId, quantity } = body;
+        const result = reservationRequestSchema.safeParse(body);
 
-        if (!quantity || quantity < 1) {
+        if (!result.success) {
             return NextResponse.json(
-                { error: "Invalid quantity" },
+                { error: result.error.issues.map((issue) => issue.message).join(", ") },
                 { status: 400 }
             );
         }
+
+        const { inventoryId, productId, warehouseId, quantity } = result.data;
 
         const reservation = await prisma.$transaction(async (tx) => {
             const inventory = inventoryId

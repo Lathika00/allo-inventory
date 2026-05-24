@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { addProductRequestSchema, reservationRequestSchema } from "../lib/schemas";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Product = {
@@ -387,6 +388,16 @@ export default function Home() {
         const qty =
             quantities[item.inventoryId] || 1;
 
+        const validation = reservationRequestSchema.safeParse({
+            inventoryId: item.inventoryId,
+            quantity: qty,
+        });
+
+        if (!validation.success) {
+            showToast(validation.error.issues[0]?.message || "Invalid reservation", "error");
+            return;
+        }
+
         try {
 
             const response =
@@ -401,10 +412,7 @@ export default function Home() {
                                 "application/json"
                         },
 
-                        body: JSON.stringify({
-                            inventoryId: item.inventoryId,
-                            quantity: qty,
-                        })
+                        body: JSON.stringify(validation.data)
 
                     }
                 );
@@ -471,18 +479,22 @@ export default function Home() {
 
     // ── Add Product ─────────────────────────────────────────────────────────
     async function handleAddProduct() {
-        if (!newProduct.product.trim()) { showToast("Product name is required", "error"); return; }
-        if (!newProduct.warehouseId) { showToast("Select a warehouse", "error"); return; }
+        const validation = addProductRequestSchema.safeParse({
+            product: newProduct.product,
+            warehouseId: newProduct.warehouseId,
+            availableStock: newProduct.availableStock,
+        });
+
+        if (!validation.success) {
+            showToast(validation.error.issues[0]?.message || "Invalid product data", "error");
+            return;
+        }
 
         try {
             const res = await fetch("/api/products", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    product: newProduct.product.trim(),
-                    warehouseId: newProduct.warehouseId,
-                    availableStock: Number(newProduct.availableStock) || 0,
-                }),
+                body: JSON.stringify(validation.data),
             });
 
             if (!res.ok) {
