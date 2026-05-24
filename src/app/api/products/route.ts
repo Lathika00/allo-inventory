@@ -74,12 +74,10 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            const existingInventory = await tx.inventory.findUnique({
+            const existingInventory = await tx.inventory.findFirst({
                 where: {
-                    productId_warehouseId: {
-                        productId: existingProduct.id,
-                        warehouseId,
-                    },
+                    productId: existingProduct.id,
+                    warehouseId,
                 },
             });
 
