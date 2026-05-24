@@ -9,13 +9,29 @@ const CACHE_TTL_SECONDS = 10 * 60; // 10 minutes
 export async function GET() {
     try {
         const cached = await getCached(CACHE_KEY);
-        if (cached) {
+        if (cached !== null && cached !== undefined) {
+            // Upstash may return parsed objects or raw strings depending on how
+            // values were written. Handle both safely.
+            if (typeof cached === "object") {
+                return NextResponse.json(cached);
+            }
+
+            if (typeof cached === "string") {
+                try {
+                    const parsed = JSON.parse(cached);
+                    return NextResponse.json(parsed);
+                } catch (err) {
+                    // fallthrough to re-fetch if cache corrupted or not JSON
+                    console.error("Failed to parse reservations cache", err);
+                }
+            }
+
+            // Unexpected type: try to coerce to string and parse as a last resort
             try {
-                const parsed = JSON.parse(cached as string);
+                const parsed = JSON.parse(String(cached));
                 return NextResponse.json(parsed);
             } catch (err) {
-                // fallthrough to re-fetch if cache corrupted
-                console.error("Failed to parse reservations cache", err);
+                console.error("Failed to parse reservations cache of unexpected type", err);
             }
         }
 
