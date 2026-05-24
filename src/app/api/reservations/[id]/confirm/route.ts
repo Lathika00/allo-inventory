@@ -1,5 +1,6 @@
 import prisma from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
+import { delCached } from "../../../../../lib/upstash";
 
 export async function POST(
     _request: Request,
@@ -51,6 +52,12 @@ export async function POST(
                 data: { status: "confirmed" },
             });
         });
+
+        try {
+            await delCached("reservations:all");
+        } catch (e) {
+            console.error("Failed to invalidate reservations cache", e);
+        }
 
         return NextResponse.json(updated);
     } catch (error) {

@@ -64,6 +64,24 @@ function fmtDate(iso: string | undefined) {
     return date.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function timeLeft(iso: string | undefined) {
+    if (!iso) return "—";
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const diff = then - now;
+    if (diff <= 0) return "Expired";
+    const secs = Math.floor(diff / 1000);
+    const mins = Math.floor(secs / 60);
+    const remSecs = secs % 60;
+    if (mins >= 60) {
+        const hrs = Math.floor(mins / 60);
+        const remM = mins % 60;
+        return `${hrs}h ${remM}m`;
+    }
+    if (mins > 0) return `${mins}m ${remSecs}s`;
+    return `${remSecs}s`;
+}
+
 const PRODUCT_ICON_RULES: { keywords: string[]; icon: string; bg: string }[] = [
     { keywords: ["laptop", "macbook", "notebook", "computer"], icon: "💻", bg: "#EFF6FF" },
     { keywords: ["phone", "iphone", "mobile", "smartphone"], icon: "📱", bg: "#F0FDF4" },
@@ -691,6 +709,7 @@ export default function Home() {
                                                 <div style={{ minWidth: 0 }}>
                                                     <div style={{ fontWeight: 500, color: "#1A1916", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.product}</div>
                                                     <div style={{ color: "#8A8880" }}>{r.quantity} unit{r.quantity > 1 ? "s" : ""}</div>
+                                                    <div style={{ color: "#8A8880", fontSize: "12px", marginTop: "4px" }}>Expires in {timeLeft(r.expiresAt)}</div>
                                                 </div>
                                             </div>
                                             <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "20px", alignSelf: "center", background: r.status === "confirmed" ? "#F0FDF4" : r.status === "pending" ? "#FEF9C3" : "#FEF2F2", color: r.status === "confirmed" ? "#15803D" : r.status === "pending" ? "#A16207" : "#DC2626" }}>
@@ -852,13 +871,13 @@ export default function Home() {
                             </div>
                         ) : (
                             <div style={{ ...S.card, overflow: "hidden" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 0.5fr 1.5fr 1fr 140px", padding: "12px 20px", background: "#F5F4F0", borderBottom: "1px solid #E8E6E0" }}>
-                                    {["Product", "Warehouse", "Qty", "Reserved at", "Status", "Action"].map((h) => (
+                                <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 0.5fr 1.5fr 1.2fr 1fr 140px", padding: "12px 20px", background: "#F5F4F0", borderBottom: "1px solid #E8E6E0" }}>
+                                    {["Product", "Warehouse", "Qty", "Reserved at", "Expires at", "Status", "Action"].map((h) => (
                                         <span key={h} style={S.label}>{h}</span>
                                     ))}
                                 </div>
                                 {reservations.map((r, i) => (
-                                    <div key={r.id} style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 0.5fr 1.5fr 1fr 140px", padding: "14px 20px", borderBottom: i < reservations.length - 1 ? "1px solid #E8E6E0" : "none", alignItems: "center" }}>
+                                    <div key={r.id} style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 0.5fr 1.5fr 1.2fr 1fr 140px", padding: "14px 20px", borderBottom: i < reservations.length - 1 ? "1px solid #F5F4F0" : "none", alignItems: "center" }}>
                                         <ProductNameCell
                                             name={r.product}
                                             sublabel={`#RES-${String(r.id).slice(-4).toUpperCase()}`}
@@ -866,6 +885,7 @@ export default function Home() {
                                         <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#F1EFE8", color: "#5F5E5A", fontSize: "12px", fontWeight: 500, padding: "4px 10px", borderRadius: "6px", width: "fit-content" }}>🏭 {r.warehouse}</span>
                                         <div style={{ fontSize: "14px", fontWeight: 600, color: "#1A1916" }}>{r.quantity}</div>
                                         <div style={{ fontSize: "12.5px", color: "#8A8880" }}>{fmtDate(r.reservedAt)}</div>
+                                        <div style={{ fontSize: "12px", color: "#8A8880" }}>{fmtDate(r.expiresAt)}{r.status === "pending" ? <span style={{ marginLeft: 8, fontSize: "11px", color: "#A16207" }}>• {timeLeft(r.expiresAt)} left</span> : null}</div>
                                         <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 9px", borderRadius: "20px", display: "inline-block", width: "fit-content", background: r.status === "confirmed" ? "#F0FDF4" : r.status === "pending" ? "#FEF9C3" : "#FEF2F2", color: r.status === "confirmed" ? "#15803D" : r.status === "pending" ? "#A16207" : "#DC2626" }}>
                                             {r.status}
                                         </span>

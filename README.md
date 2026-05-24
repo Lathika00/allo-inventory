@@ -34,3 +34,24 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+---
+
+Upstash Redis (caching)
+
+1. Add the following environment variables (Vercel or local):
+
+```
+UPSTASH_REDIS_REST_URL=<your-upstash-rest-url>
+UPSTASH_REDIS_REST_TOKEN=<your-upstash-rest-token>
+```
+
+2. Install the dependency:
+
+```bash
+npm install @upstash/redis
+```
+
+3. The project includes `src/lib/upstash.ts` and the `reservations/all` endpoint now caches the reservations list for 10 minutes.
+
+If you want caching applied elsewhere (rate-limits, sessions, pub/sub), tell me where and I'll add examples.

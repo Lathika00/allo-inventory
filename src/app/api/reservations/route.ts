@@ -1,5 +1,6 @@
 import prisma from "../../../lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { delCached } from "../../../lib/upstash";
 
 export async function POST(req: NextRequest) {
     try {
@@ -16,11 +17,11 @@ export async function POST(req: NextRequest) {
         const reservation = await prisma.$transaction(async (tx) => {
             const inventory = inventoryId
                 ? await tx.inventory.findUnique({
-                      where: { id: inventoryId },
-                  })
+                    where: { id: inventoryId },
+                })
                 : await tx.inventory.findFirst({
-                      where: { productId, warehouseId },
-                  });
+                    where: { productId, warehouseId },
+                });
 
             if (!inventory) {
                 throw new Error("Inventory not found");
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
             });
         });
 
+        // invalidate reservations list cache
+        try {
+            await delCached("reservations:all");
+        } catch (e) {
+            console.error("Failed to invalidate reservations cache", e);
+        }
+
         return NextResponse.json(reservation);
     } catch (error) {
         if (
@@ -80,3 +88,7 @@ export async function POST(req: NextRequest) {
         );
     }
 }
+
+// invalidate reservations cache when created
+// Note: using delCached because response already sent above when successful
+// but it's fine to call here after creation inside the try block
